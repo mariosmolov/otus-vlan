@@ -11,6 +11,11 @@
 testClient1 <-> testServer1
 testClient2 <-> testServer2
 
+Схема сети
+
+![1](https://github.com/mariosmolov/otus-vlan/blob/master/network23.png)
+
+
 Между centralRouter и inetRouter создать 2 линка (общая inernal сеть) и объединить их с помощью bond-интерфейса, 
 проверить работу c отключением сетевых интерфейсов
 
