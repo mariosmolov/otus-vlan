@@ -1,0 +1,104 @@
+---
+- hosts:
+   - inetRouter
+   - centralRouter
+   - officeRouter
+  become: true
+  tasks:
+    - name: enable forwarding on routers
+      sysctl:
+        name: net.ipv4.conf.all.forwarding
+        value: '1'
+        sysctl_set: yes
+        reload: yes
+
+
+- hosts: all
+  become: true
+  tasks:
+  - name: copy network configs
+    copy: src={{ item }} dest=/etc/sysconfig/network-scripts owner=root group=root mode=0644
+    with_fileglob:
+      - "{{ ansible_hostname }}/*"
+
+  - name: restart NetworkManager
+    systemd:
+      name: NetworkManager
+      state: restarted
+
+
+- hosts: inetRouter
+  become: true
+  tasks:
+
+  - name: route 192.168.0.0/16 via centralRouter
+    command: ip route replace 192.168.0.0/16 via 192.168.255.2
+
+  - name: route vlan100 via centralRouter
+    command: ip route replace 10.10.100.0/24 via 192.168.255.2
+
+  - name: route vlan101 via centralRouter
+    command: ip route replace 10.10.101.0/24 via 192.168.255.2
+
+
+  - name: masquerade lan to internet
+    iptables:
+      table: nat
+      out_interface: eth0
+      destination: "!192.168.0.0/16"
+      chain: POSTROUTING
+      jump: MASQUERADE
+
+- hosts: centralRouter
+  become: true
+  tasks:
+
+  - name: default route via inetRouter
+    command: ip route replace default via 192.168.255.1
+
+  - name: add route to vlans100 via office1Router
+    command: ip route replace 10.10.100.0/24 via 192.168.255.6
+
+  - name: add route to vlans101 via office1Router
+    command: ip route replace 10.10.101.0/24 via 192.168.255.6
+
+- hosts: officeRouter
+  become: true
+  tasks:
+
+  - name: default route via centralRouter
+    command: ip route replace default via 192.168.255.5
+
+  - name: check exists VRF100
+    stat:
+      path: /var/run/netns/VRF100
+      get_checksum: no
+    register: net100
+
+  - include_tasks: vrf.yml
+    vars:
+      vrf_num: 100
+    when: net100.stat.exists == False
+
+  - name: check exists VRF101
+    stat:
+      path: /var/run/netns/VRF101
+      get_checksum: no
+    register: net101
+
+  - include_tasks: vrf.yml
+    vars:
+      vrf_num: 101
+    when: net101.stat.exists == False
+
+- hosts:
+    - testServer1
+    - testClient1
+    - testServer2
+    - testClient2
+  become: true
+  tasks:
+
+  - name: add default route via officeRouter
+    command: ip route replace default via 10.10.10.2
+

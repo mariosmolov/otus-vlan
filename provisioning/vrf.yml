@@ -1,0 +1,41 @@
+  - name: add netns VRF{{ vrf_num  }}
+    command: ip netns add VRF{{ vrf_num }}
+
+  - name: set eth2.{{ vrf_num }} to netns VRF{{ vrf_num }}
+    command: ip link set eth2.{{ vrf_num }} netns VRF{{ vrf_num }}
+
+  - name: add 10.10.10.2/24 dev eth2.{{ vrf_num }}
+    command: ip netns exec VRF{{ vrf_num }} ip address add 10.10.10.2/24 dev eth2.{{ vrf_num }}
+
+  - name: eth2.{{ vrf_num }} up
+    command: ip netns exec VRF{{ vrf_num }} ip link set eth2.{{ vrf_num }} up
+
+  - name: link veth{{ vrf_num }}-vrf with veth{{ vrf_num }}
+    command: ip link add veth{{ vrf_num }}-vrf type veth peer name veth{{ vrf_num }}
+
+  - name: veth{{ vrf_num }}-vrf up
+    command: ip link set veth{{ vrf_num }}-vrf up
+
+  - name: set veth{{ vrf_num }} to netns VRF{{ vrf_num }}
+    command: ip link set veth{{ vrf_num }} netns VRF{{ vrf_num }}
+
+  - name: veth{{ vrf_num }} up
+    command: ip netns exec VRF{{ vrf_num }} ip link set veth{{ vrf_num }} up
+
+  - name: add 172.29.{{ vrf_num }}.1/30 dev veth{{ vrf_num }}-vrf
+    command: ip address add 172.29.{{ vrf_num }}.1/30 dev veth{{ vrf_num }}-vrf
+
+  - name: add 172.29.{{ vrf_num }}.2/30 dev veth{{ vrf_num }}
+    command: ip netns exec VRF{{ vrf_num }} ip address add 172.29.{{ vrf_num }}.2/30 dev veth{{ vrf_num }}
+
+  - name: route default via 172.29.{{ vrf_num }}.1 for VRF{{ vrf_num }}
+    command: ip netns exec VRF{{ vrf_num }} ip route add default via 172.29.{{ vrf_num }}.1
+
+  - name: route 10.10.{{ vrf_num }}.0/24 via 172.29.{{ vrf_num }}.2
+    command: ip route add 10.10.{{ vrf_num }}.0/24 via 172.29.{{ vrf_num }}.2
+
+  - name: PREROUTING 10.10.{{ vrf_num }}.0/24 to 10.10.10.0/24
+    command: ip netns exec VRF{{ vrf_num }} iptables -t nat -I PREROUTING -d 10.10.{{ vrf_num }}.0/24 -j NETMAP --to 10.10.10.0/24
+
+  - name: POSTROUTING 10.10.10.0/24 to 10.10.{{ vrf_num }}.0/24
+    command: ip netns exec VRF{{ vrf_num }} iptables -t nat -I POSTROUTING -s 10.10.10.0/24 -j NETMAP --to 10.10.{{ vrf_num }}.0/24

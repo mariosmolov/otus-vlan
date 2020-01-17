@@ -1,0 +1,5 @@
+DEVICE=eth2
+DEVICETYPE=TeamPort
+ONBOOT=yes
+TEAM_MASTER=team0
+NAME=eth2
